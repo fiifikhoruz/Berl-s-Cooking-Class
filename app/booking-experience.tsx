@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, MouseEvent as ReactMouseEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -37,20 +37,6 @@ function toDateKey(date: Date) {
   return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
 }
 
-function buildFallbackAvailability() {
-  const result: Availability = {};
-  const cursor = new Date();
-  cursor.setHours(12, 0, 0, 0);
-  for (let i = 1; i <= 35; i += 1) {
-    const date = new Date(cursor);
-    date.setDate(cursor.getDate() + i);
-    if ([1, 2, 3].includes(date.getDay())) result[toDateKey(date)] = ["10:00", "13:00", "16:00"];
-  }
-  return result;
-}
-
-const fallbackAvailability = buildFallbackAvailability();
-
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("en", { weekday: "long", month: "long", day: "numeric" }).format(date);
 }
@@ -60,6 +46,13 @@ function formatTime(time: string) {
   const value = new Date();
   value.setHours(hour, minute, 0, 0);
   return value.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+async function fetchAvailability(signal?: AbortSignal) {
+  const response = await fetch("/api/availability", { cache: "no-store", signal });
+  const payload = await response.json() as AvailabilityResponse & { error?: string };
+  if (!response.ok) throw new Error(payload.error ?? "Availability is temporarily unavailable.");
+  return payload.availability;
 }
 
 function scrollToSection(event: ReactMouseEvent<HTMLAnchorElement>, id: string) {
@@ -76,16 +69,39 @@ export function BookingExperience() {
   const [dishId, setDishId] = useState(dishes[0].id);
   const [date, setDate] = useState<Date>();
   const [time, setTime] = useState("");
-  const [availability, setAvailability] = useState<Availability>(fallbackAvailability);
+  const [availability, setAvailability] = useState<Availability>({});
+  const [availabilityLoading, setAvailabilityLoading] = useState(true);
+  const [availabilityError, setAvailabilityError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [bookingId, setBookingId] = useState("");
 
+  const loadAvailability = useCallback(async () => {
+    setAvailabilityLoading(true);
+    setAvailabilityError("");
+    try {
+      setAvailability(await fetchAvailability());
+    } catch {
+      setAvailability({});
+      setAvailabilityError("Booking times are temporarily unavailable. Please try again.");
+    } finally {
+      setAvailabilityLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    fetch("/api/availability")
-      .then((response) => (response.ok ? response.json() : Promise.reject()))
-      .then((payload) => setAvailability((payload as AvailabilityResponse).availability))
-      .catch(() => setAvailability(fallbackAvailability));
+    const controller = new AbortController();
+    fetchAvailability(controller.signal)
+      .then((nextAvailability) => setAvailability(nextAvailability))
+      .catch((caught) => {
+        if (caught instanceof DOMException && caught.name === "AbortError") return;
+        setAvailability({});
+        setAvailabilityError("Booking times are temporarily unavailable. Please try again.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setAvailabilityLoading(false);
+      });
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
@@ -218,8 +234,10 @@ export function BookingExperience() {
             <button onClick={() => setStep(1)} className="mb-6 flex min-h-11 items-center gap-2 text-sm font-semibold underline underline-offset-4"><ArrowLeft className="size-4" /> Change dish</button>
             <h3 className="font-serif text-4xl font-normal leading-[0.95] tracking-[-0.04em] sm:text-5xl">Choose an available day.</h3>
             <p className="mt-2 text-sm leading-6 text-neutral-600">Regular sessions run Monday to Wednesday. Selected Saturdays may also open.</p>
+            {availabilityError && <div role="alert" className="mt-6 flex flex-col items-start gap-3 border border-black p-4 text-sm sm:flex-row sm:items-center sm:justify-between"><span>{availabilityError}</span><Button type="button" variant="outline" onClick={() => void loadAvailability()} className="h-11 shrink-0 rounded-none border-black bg-white">Try again</Button></div>}
+            {availabilityLoading && <p role="status" className="mt-6 border border-black p-4 text-sm">Loading available times…</p>}
             <div className="mt-8 grid gap-8 xl:grid-cols-[auto_1fr]">
-              <div className="max-w-full overflow-x-auto border border-black bg-white p-1 sm:p-2"><Calendar mode="single" selected={date} onSelect={selectDate} disabled={(day) => !availableDates.has(toDateKey(day))} className="mx-auto bg-white p-1 [--cell-size:1.95rem] sm:p-3 sm:[--cell-size:2rem]" /></div>
+              <div className="max-w-full overflow-x-auto border border-black bg-white p-1 sm:p-2"><Calendar mode="single" selected={date} onSelect={selectDate} disabled={(day) => availabilityLoading || Boolean(availabilityError) || !availableDates.has(toDateKey(day))} className="mx-auto bg-white p-1 [--cell-size:1.95rem] sm:p-3 sm:[--cell-size:2rem]" /></div>
               <div>
                 <p className="mb-4 border-b border-black pb-3 text-sm font-semibold">{date ? formatDate(date) : "Select a day first"}</p>
                 <div className="grid grid-cols-2 gap-2 xl:grid-cols-1">{times.map((slot) => <button key={slot} type="button" onClick={() => setTime(slot)} className={`min-h-12 border border-black px-4 py-3 text-sm font-semibold transition-colors ${time === slot ? "bg-black text-white" : "bg-white hover:bg-neutral-100"}`}>{formatTime(slot)}</button>)}</div>

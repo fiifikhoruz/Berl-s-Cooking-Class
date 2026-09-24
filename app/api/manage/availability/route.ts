@@ -1,4 +1,3 @@
-import { env } from "cloudflare:workers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getChatGPTUser } from "@/app/chatgpt-auth";
@@ -14,7 +13,7 @@ const overrideSchema = z.object({
 export async function POST(request: Request) {
   const vercel = isVercelRuntime();
   const user = vercel ? null : await getChatGPTUser();
-  const adminEmail = (process.env.ADMIN_EMAIL ?? env.ADMIN_EMAIL)?.trim().toLowerCase();
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
   const authorized = vercel ? await hasAdminSession() : Boolean(user && adminEmail && user.email.toLowerCase() === adminEmail);
   if (!authorized) {
     return NextResponse.json({ error: "You do not have permission to manage availability." }, { status: 403 });

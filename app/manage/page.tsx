@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { env } from "cloudflare:workers";
 import { requireChatGPTUser } from "@/app/chatgpt-auth";
 import { hasAdminSession, isVercelRuntime } from "@/lib/admin-session";
 import { listUpcomingBookings } from "@/lib/data-store";
@@ -11,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function ManagePage() {
   const vercel = isVercelRuntime();
   const user = vercel ? null : await requireChatGPTUser("/manage");
-  const adminEmail = (process.env.ADMIN_EMAIL ?? env.ADMIN_EMAIL)?.trim().toLowerCase();
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
 
   if (vercel && !await hasAdminSession()) redirect("/manage/login");
 

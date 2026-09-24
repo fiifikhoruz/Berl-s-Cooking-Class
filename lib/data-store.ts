@@ -1,5 +1,3 @@
-import { and, desc, eq, gte, lte } from "drizzle-orm";
-
 export type BookingRecord = {
   id: string;
   dishId: string;
@@ -23,19 +21,50 @@ export type AvailabilityOverrideRecord = {
   updatedAt: Date;
 };
 
-function hasSupabaseConfig() {
-  return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+type SupabaseConfig = { url: string; key: string; legacyJwt: boolean };
+
+function getSupabaseConfig(): SupabaseConfig {
+  const url = process.env.SUPABASE_URL?.trim();
+  const key = (process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY)?.trim();
+
+  if (!url || !key) {
+    throw new Error("Supabase server environment variables are missing.");
+  }
+
+  if (key.startsWith("sb_publishable_")) {
+    throw new Error("SUPABASE_SECRET_KEY contains a publishable key. Configure a server secret key instead.");
+  }
+
+  try {
+    const parsedUrl = new URL(url);
+    if (parsedUrl.protocol !== "https:") throw new Error();
+  } catch {
+    throw new Error("SUPABASE_URL is not a valid HTTPS project URL.");
+  }
+
+  const legacyJwt = key.startsWith("eyJ");
+  if (legacyJwt) {
+    try {
+      const payload = JSON.parse(Buffer.from(key.split(".")[1], "base64url").toString("utf8")) as { role?: string };
+      if (payload.role !== "service_role") {
+        throw new Error("SUPABASE_SERVICE_ROLE_KEY does not contain a service_role key.");
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("service_role")) throw error;
+      throw new Error("SUPABASE_SERVICE_ROLE_KEY is not a valid service_role key.");
+    }
+  }
+
+  return { url, key, legacyJwt };
 }
 
 async function supabaseRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Supabase environment variables are missing.");
-  const response = await fetch(`${url.replace(/\/$/, "")}/rest/v1/${path}`, {
+  const config = getSupabaseConfig();
+  const response = await fetch(`${config.url.replace(/\/$/, "")}/rest/v1/${path}`, {
     ...init,
     headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
+      apikey: config.key,
+      ...(config.legacyJwt ? { Authorization: `Bearer ${config.key}` } : {}),
       "Content-Type": "application/json",
       ...init?.headers,
     },
@@ -52,90 +81,63 @@ async function supabaseRequest<T>(path: string, init?: RequestInit): Promise<T> 
 }
 
 export async function getAvailabilityInputs(startKey: string, endKey: string) {
-  if (hasSupabaseConfig()) {
-    const [overrides, reserved] = await Promise.all([
-      supabaseRequest<Array<{ key: string; session_date: string; session_time: string; available: boolean; updated_at: string }>>(
-        `availability_overrides?select=key,session_date,session_time,available,updated_at&session_date=gte.${startKey}&session_date=lte.${endKey}`,
-      ),
-      supabaseRequest<Array<{ session_date: string; session_time: string }>>(
-        `bookings?select=session_date,session_time&session_date=gte.${startKey}&session_date=lte.${endKey}&status=eq.confirmed`,
-      ),
-    ]);
-    return {
-      overrides: overrides.map((row) => ({ key: row.key, sessionDate: row.session_date, sessionTime: row.session_time, available: row.available, updatedAt: new Date(row.updated_at) })),
-      reserved: reserved.map((row) => ({ date: row.session_date, time: row.session_time })),
-    };
-  }
-
-  const [{ getDb }, { availabilityOverrides, bookings }] = await Promise.all([import("@/db"), import("@/db/schema")]);
-  const db = getDb();
   const [overrides, reserved] = await Promise.all([
-    db.select().from(availabilityOverrides).where(and(gte(availabilityOverrides.sessionDate, startKey), lte(availabilityOverrides.sessionDate, endKey))),
-    db.select({ date: bookings.sessionDate, time: bookings.sessionTime }).from(bookings).where(and(gte(bookings.sessionDate, startKey), lte(bookings.sessionDate, endKey), eq(bookings.status, "confirmed"))),
+    supabaseRequest<Array<{ key: string; session_date: string; session_time: string; available: boolean; updated_at: string }>>(
+      `availability_overrides?select=key,session_date,session_time,available,updated_at&session_date=gte.${startKey}&session_date=lte.${endKey}`,
+    ),
+    supabaseRequest<Array<{ session_date: string; session_time: string }>>(
+      `bookings?select=session_date,session_time&session_date=gte.${startKey}&session_date=lte.${endKey}&status=eq.confirmed`,
+    ),
   ]);
-  return { overrides, reserved };
+  return {
+    overrides: overrides.map((row) => ({ key: row.key, sessionDate: row.session_date, sessionTime: row.session_time, available: row.available, updatedAt: new Date(row.updated_at) })),
+    reserved: reserved.map((row) => ({ date: row.session_date, time: row.session_time })),
+  };
 }
 
 export async function createBooking(data: BookingInput) {
-  if (hasSupabaseConfig()) {
-    await supabaseRequest("bookings", {
-      method: "POST",
-      headers: { Prefer: "return=minimal" },
-      body: JSON.stringify({
-        id: data.id,
-        dish_id: data.dishId,
-        dish_name: data.dishName,
-        session_date: data.sessionDate,
-        session_time: data.sessionTime,
-        guest_name: data.guestName,
-        guest_email: data.guestEmail,
-        guest_phone: data.guestPhone,
-        notes: data.notes,
-        status: data.status,
-        created_at: data.createdAt.toISOString(),
-      }),
-    });
-    return;
-  }
-  const [{ getDb }, { bookings }] = await Promise.all([import("@/db"), import("@/db/schema")]);
-  await getDb().insert(bookings).values(data);
+  await supabaseRequest("bookings", {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({
+      id: data.id,
+      dish_id: data.dishId,
+      dish_name: data.dishName,
+      session_date: data.sessionDate,
+      session_time: data.sessionTime,
+      guest_name: data.guestName,
+      guest_email: data.guestEmail,
+      guest_phone: data.guestPhone,
+      notes: data.notes,
+      status: data.status,
+      created_at: data.createdAt.toISOString(),
+    }),
+  });
 }
 
 export async function listUpcomingBookings(today: string): Promise<BookingRecord[]> {
-  if (hasSupabaseConfig()) {
-    const rows = await supabaseRequest<Array<Record<string, string | null>>>(
-      `bookings?select=id,dish_id,dish_name,session_date,session_time,guest_name,guest_email,guest_phone,notes,status,created_at&session_date=gte.${today}&order=session_date.desc,session_time.asc`,
-    );
-    return rows.map((row) => ({
-      id: row.id ?? "",
-      dishId: row.dish_id ?? "",
-      dishName: row.dish_name ?? "",
-      sessionDate: row.session_date ?? "",
-      sessionTime: row.session_time ?? "",
-      guestName: row.guest_name ?? "",
-      guestEmail: row.guest_email ?? "",
-      guestPhone: row.guest_phone,
-      notes: row.notes,
-      status: row.status ?? "confirmed",
-      createdAt: new Date(row.created_at ?? Date.now()),
-    }));
-  }
-  const [{ getDb }, { bookings }] = await Promise.all([import("@/db"), import("@/db/schema")]);
-  return getDb().select().from(bookings).where(gte(bookings.sessionDate, today)).orderBy(desc(bookings.sessionDate));
+  const rows = await supabaseRequest<Array<Record<string, string | null>>>(
+    `bookings?select=id,dish_id,dish_name,session_date,session_time,guest_name,guest_email,guest_phone,notes,status,created_at&session_date=gte.${today}&order=session_date.desc,session_time.asc`,
+  );
+  return rows.map((row) => ({
+    id: row.id ?? "",
+    dishId: row.dish_id ?? "",
+    dishName: row.dish_name ?? "",
+    sessionDate: row.session_date ?? "",
+    sessionTime: row.session_time ?? "",
+    guestName: row.guest_name ?? "",
+    guestEmail: row.guest_email ?? "",
+    guestPhone: row.guest_phone,
+    notes: row.notes,
+    status: row.status ?? "confirmed",
+    createdAt: new Date(row.created_at ?? Date.now()),
+  }));
 }
 
 export async function upsertAvailabilityOverride(data: AvailabilityOverrideRecord) {
-  if (hasSupabaseConfig()) {
-    await supabaseRequest("availability_overrides?on_conflict=key", {
-      method: "POST",
-      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-      body: JSON.stringify({ key: data.key, session_date: data.sessionDate, session_time: data.sessionTime, available: data.available, updated_at: data.updatedAt.toISOString() }),
-    });
-    return;
-  }
-  const [{ getDb }, { availabilityOverrides }] = await Promise.all([import("@/db"), import("@/db/schema")]);
-  await getDb().insert(availabilityOverrides).values(data).onConflictDoUpdate({
-    target: availabilityOverrides.key,
-    set: { available: data.available, updatedAt: data.updatedAt },
+  await supabaseRequest("availability_overrides?on_conflict=key", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({ key: data.key, session_date: data.sessionDate, session_time: data.sessionTime, available: data.available, updated_at: data.updatedAt.toISOString() }),
   });
 }
