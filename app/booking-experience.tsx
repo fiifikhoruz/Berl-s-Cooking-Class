@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 type Dish = { id: string; name: string; description: string };
 type Availability = Record<string, string[]>;
 type AvailabilityResponse = { availability: Availability };
-type BookingResponse = { bookingId: string; status: string; error?: string };
+type BookingResponse = { bookingId: string; status: string; error?: string; confirmationEmailSent?: boolean; adminNotificationSent?: boolean; meetingUrl?: string | null };
 type ModelContext = {
   registerTool: (
     tool: {
@@ -75,6 +75,8 @@ export function BookingExperience() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [bookingId, setBookingId] = useState("");
+  const [confirmationEmailSent, setConfirmationEmailSent] = useState(false);
+  const [meetingUrl, setMeetingUrl] = useState<string | null>(null);
 
   const loadAvailability = useCallback(async () => {
     setAvailabilityLoading(true);
@@ -143,8 +145,10 @@ export function BookingExperience() {
         setDate(new Date(year, month - 1, day, 12));
         setTime(data.time);
         setBookingId(payload.bookingId);
+        setConfirmationEmailSent(Boolean(payload.confirmationEmailSent));
+        setMeetingUrl(payload.meetingUrl ?? null);
         setStep(4);
-        return { bookingId: payload.bookingId, status: payload.status, dish: dishNames[data.dishId], date: data.date, time: data.time };
+        return { bookingId: payload.bookingId, status: payload.status, confirmationEmailSent: payload.confirmationEmailSent, dish: dishNames[data.dishId], date: data.date, time: data.time };
       },
     }, { signal: lifecycle.signal })).catch(() => {});
     return () => lifecycle.abort();
@@ -175,6 +179,8 @@ export function BookingExperience() {
       const payload = await response.json() as BookingResponse;
       if (!response.ok) throw new Error(payload.error ?? "We could not confirm that session.");
       setBookingId(payload.bookingId);
+      setConfirmationEmailSent(Boolean(payload.confirmationEmailSent));
+      setMeetingUrl(payload.meetingUrl ?? null);
       setStep(4);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "We could not confirm that session.");
@@ -265,8 +271,10 @@ export function BookingExperience() {
             <span className="grid size-14 place-items-center border border-black"><Check className="size-7" /></span>
             <h3 className="mt-8 max-w-xl font-serif text-5xl font-normal leading-[0.95] tracking-[-0.045em] sm:text-6xl">Session confirmed. See you in the kitchen.</h3>
             <p className="mt-5 max-w-lg text-base leading-7 text-neutral-600">Your {selectedDish.name} session is booked for {formatDate(date)} at {formatTime(time)}.</p>
+            {confirmationEmailSent ? <p className="mt-3 max-w-lg text-sm leading-6 text-neutral-600">A confirmation email with your session details has been sent.</p> : <p role="status" className="mt-3 max-w-lg border border-black p-3 text-sm leading-6">Your booking is saved, but the confirmation email could not be sent. Keep the booking reference below or call +1 (416) 826-8466.</p>}
+            {meetingUrl && <a href={meetingUrl} target="_blank" rel="noreferrer" className="mt-6 inline-flex min-h-12 items-center justify-center bg-black px-5 text-sm font-semibold text-white hover:bg-neutral-800">Join the virtual session <ArrowRight className="ml-2 size-4" /></a>}
             <p className="mt-6 border-y border-black py-3 text-xs">Booking reference: {bookingId}</p>
-            <Button variant="outline" onClick={() => { setStep(1); setDate(undefined); setTime(""); setBookingId(""); }} className="mt-8 h-12 rounded-none border-black bg-transparent">Book another session</Button>
+            <Button variant="outline" onClick={() => { setStep(1); setDate(undefined); setTime(""); setBookingId(""); setConfirmationEmailSent(false); setMeetingUrl(null); }} className="mt-8 h-12 rounded-none border-black bg-transparent">Book another session</Button>
           </div>}
         </div>
       </section>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createBooking } from "@/lib/data-store";
+import { sendBookingEmails } from "@/lib/booking-emails";
 import { getAvailability } from "@/lib/schedule";
 
 const bookingSchema = z.object({
@@ -39,7 +40,19 @@ export async function POST(request: Request) {
       createdAt: new Date(),
     });
 
-    return NextResponse.json({ bookingId: id.split("-")[0].toUpperCase(), status: "confirmed" }, { status: 201 });
+    const bookingId = id.split("-")[0].toUpperCase();
+    const emailResult = await sendBookingEmails({
+      bookingReference: bookingId,
+      dishName: data.dishName,
+      sessionDate: data.date,
+      sessionTime: data.time,
+      guestName: data.name,
+      guestEmail: data.email.toLowerCase(),
+      guestPhone: data.phone || null,
+      notes: data.notes || null,
+    });
+
+    return NextResponse.json({ bookingId, status: "confirmed", ...emailResult }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (message.includes("UNIQUE") || message.includes("409") || message.includes("23505")) return NextResponse.json({ error: "That time has just been booked. Please choose another." }, { status: 409 });

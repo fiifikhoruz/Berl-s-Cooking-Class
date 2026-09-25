@@ -15,6 +15,12 @@ Required variables:
 - `ADMIN_EMAIL`
 - `ADMIN_PASSWORD`
 - `SESSION_SECRET`
+- `RESEND_API_KEY`
+- `BOOKING_FROM_EMAIL`
+- `BOOKING_NOTIFICATION_EMAILS`
+- `SESSION_MEETING_URL`
+
+Resend requires `BOOKING_FROM_EMAIL` to use a sender address on a verified domain. Separate multiple notification recipients with commas. The reusable Google Meet or Zoom URL is included on the confirmation page and in the visitor email.
 
 ## 3. Deploy
 
@@ -23,6 +29,7 @@ Import the repository into Vercel or run the Vercel CLI from the project root. V
 ## 4. Verify
 
 - Open the homepage and complete a test booking.
+- Confirm that the visitor and each notification recipient receive their emails.
 - Confirm that the selected time disappears from availability.
 - Open `/manage`, sign in with the admin credentials, and confirm the booking appears.
 - Open and close one future time slot, then verify the public calendar updates.
