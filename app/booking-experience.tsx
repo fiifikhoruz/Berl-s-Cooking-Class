@@ -192,7 +192,7 @@ export function BookingExperience() {
   return (
     <main className="min-h-screen bg-white text-black">
       <section id="top" className="relative min-h-screen overflow-hidden border-b border-black bg-black text-white supports-[height:100svh]:min-h-[100svh]">
-        <Image src="/ghana-cooking-hero.png" alt="Ghanaian jollof rice with grilled chicken and plantain" fill priority sizes="100vw" className="object-cover object-[68%_center] sm:object-center" />
+        <Image src="/ghana-cooking-hero.png" alt="Jollof rice with roasted chicken and fried plantain" fill priority sizes="100vw" className="object-cover object-[58%_center] sm:object-center" />
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.84)_0%,rgba(0,0,0,0.62)_44%,rgba(0,0,0,0.14)_78%,rgba(0,0,0,0.08)_100%)]" aria-hidden="true" />
         <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(0,0,0,0.72)_0%,transparent_52%,rgba(0,0,0,0.38)_100%)]" aria-hidden="true" />
 
