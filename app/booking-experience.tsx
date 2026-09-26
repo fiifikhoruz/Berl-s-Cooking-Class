@@ -192,7 +192,14 @@ export function BookingExperience() {
   return (
     <main className="min-h-screen bg-white text-black">
       <section id="top" className="relative min-h-screen overflow-hidden border-b border-black bg-black text-white supports-[height:100svh]:min-h-[100svh]">
-        <Image src="/ghana-cooking-hero.png" alt="Jollof rice with roasted chicken and fried plantain" fill priority sizes="100vw" className="object-cover object-[58%_center] sm:object-center" />
+        <div className="absolute inset-0 grid grid-rows-2 sm:grid-cols-2 sm:grid-rows-1">
+          <div className="relative min-h-0 overflow-hidden">
+            <Image src="/waakye-editorial.png" alt="Waakye with stew, egg, gari and spaghetti" fill priority sizes="(min-width: 640px) 50vw, 100vw" className="object-cover object-center" />
+          </div>
+          <div className="relative min-h-0 overflow-hidden">
+            <Image src="/red-red-editorial.png" alt="Red red bean stew with fried plantain" fill priority sizes="(min-width: 640px) 50vw, 100vw" className="object-cover object-center" />
+          </div>
+        </div>
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.84)_0%,rgba(0,0,0,0.62)_44%,rgba(0,0,0,0.14)_78%,rgba(0,0,0,0.08)_100%)]" aria-hidden="true" />
         <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(0,0,0,0.72)_0%,transparent_52%,rgba(0,0,0,0.38)_100%)]" aria-hidden="true" />
 
