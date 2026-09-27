@@ -31,6 +31,7 @@ const dishes: Dish[] = [
   { id: "waakye", name: "Waakye", description: "The rice-and-beans classic, with a simple way to bring the plate together." },
   { id: "red-red", name: "Red Red", description: "A full-bodied bean stew with sweet, golden plantain." },
   { id: "groundnut-soup", name: "Groundnut Soup", description: "Smooth, savoury groundnut soup with balanced heat and depth." },
+  { id: "other", name: "Another dish", description: "Choose this if the food you want to prepare is not listed." },
 ];
 
 function toDateKey(date: Date) {
@@ -67,6 +68,7 @@ function scrollToSection(event: ReactMouseEvent<HTMLAnchorElement>, id: string) 
 export function BookingExperience() {
   const [step, setStep] = useState(1);
   const [dishId, setDishId] = useState(dishes[0].id);
+  const [customDishName, setCustomDishName] = useState("");
   const [date, setDate] = useState<Date>();
   const [time, setTime] = useState("");
   const [availability, setAvailability] = useState<Availability>({});
@@ -119,6 +121,7 @@ export function BookingExperience() {
         type: "object",
         properties: {
           dishId: { type: "string", enum: dishes.map((dish) => dish.id) },
+          customDishName: { type: "string", minLength: 2, maxLength: 80 },
           date: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
           time: { type: "string", pattern: "^\\d{2}:\\d{2}$" },
           name: { type: "string", minLength: 2 },
@@ -132,29 +135,32 @@ export function BookingExperience() {
       annotations: { readOnlyHint: false, untrustedContentHint: false },
       async execute(input) {
         const data = input as Record<string, string>;
-        if (!dishNames[data.dishId] || !data.date || !data.time || !data.name || !data.email) throw new Error("Missing or invalid booking details.");
+        const dishName = data.dishId === "other" ? data.customDishName?.trim() : dishNames[data.dishId];
+        if (!dishName || dishName.length < 2 || !data.date || !data.time || !data.name || !data.email) throw new Error("Missing or invalid booking details.");
         const response = await fetch("/api/bookings", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...data, dishName: dishNames[data.dishId], phone: data.phone ?? "", notes: data.notes ?? "" }),
+          body: JSON.stringify({ ...data, dishName, phone: data.phone ?? "", notes: data.notes ?? "" }),
         });
         const payload = await response.json() as BookingResponse;
         if (!response.ok) throw new Error(payload.error ?? "Booking failed.");
         const [year, month, day] = data.date.split("-").map(Number);
         setDishId(data.dishId);
+        setCustomDishName(data.dishId === "other" ? dishName : "");
         setDate(new Date(year, month - 1, day, 12));
         setTime(data.time);
         setBookingId(payload.bookingId);
         setConfirmationEmailSent(Boolean(payload.confirmationEmailSent));
         setMeetingUrl(payload.meetingUrl ?? null);
         setStep(4);
-        return { bookingId: payload.bookingId, status: payload.status, confirmationEmailSent: payload.confirmationEmailSent, dish: dishNames[data.dishId], date: data.date, time: data.time };
+        return { bookingId: payload.bookingId, status: payload.status, confirmationEmailSent: payload.confirmationEmailSent, dish: dishName, date: data.date, time: data.time };
       },
     }, { signal: lifecycle.signal })).catch(() => {});
     return () => lifecycle.abort();
   }, []);
-
   const selectedDish = dishes.find((dish) => dish.id === dishId) ?? dishes[0];
+  const selectedDishName = dishId === "other" ? customDishName.trim() : selectedDish.name;
+  const canContinueFromDish = dishId !== "other" || selectedDishName.length >= 2;
   const availableDates = useMemo(() => new Set(Object.keys(availability).filter((key) => availability[key]?.length)), [availability]);
   const dateKey = date ? toDateKey(date) : "";
   const times = dateKey ? availability[dateKey] ?? [] : [];
@@ -174,7 +180,7 @@ export function BookingExperience() {
       const response = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dishId, dishName: selectedDish.name, date: dateKey, time, name: form.get("name"), email: form.get("email"), phone: form.get("phone"), notes: form.get("notes") }),
+        body: JSON.stringify({ dishId, dishName: selectedDishName, date: dateKey, time, name: form.get("name"), email: form.get("email"), phone: form.get("phone"), notes: form.get("notes") }),
       });
       const payload = await response.json() as BookingResponse;
       if (!response.ok) throw new Error(payload.error ?? "We could not confirm that session.");
@@ -240,7 +246,12 @@ export function BookingExperience() {
                 <span className={`grid size-6 place-items-center border ${selected ? "border-white" : "border-black"}`}>{selected && <Check className="size-4" />}</span>
               </button>;
             })}</div>
-            <div className="mt-7 flex justify-end"><Button onClick={() => setStep(2)} size="lg" className="h-12 w-full rounded-none bg-black px-6 text-base text-white hover:bg-neutral-800 sm:w-auto">Choose a date <ArrowRight /></Button></div>
+            {dishId === "other" && <div className="border-x border-b border-black bg-neutral-50 p-4 sm:p-5">
+              <Label htmlFor="custom-dish" className="text-sm font-semibold">What would you like to prepare?</Label>
+              <Input id="custom-dish" value={customDishName} onChange={(event) => setCustomDishName(event.target.value)} maxLength={80} autoComplete="off" placeholder="Enter the name of the dish" className="mt-2 h-12 rounded-none border-black bg-white" />
+              <p className="mt-2 text-sm leading-6 text-neutral-600">The host will review your choice before the session.</p>
+            </div>}
+            <div className="mt-7 flex justify-end"><Button disabled={!canContinueFromDish} onClick={() => setStep(2)} size="lg" className="h-12 w-full rounded-none bg-black px-6 text-base text-white hover:bg-neutral-800 sm:w-auto">Choose a date <ArrowRight /></Button></div>
           </div>}
 
           {step === 2 && <div>
@@ -263,7 +274,7 @@ export function BookingExperience() {
           {step === 3 && date && <form onSubmit={submitBooking}>
             <button type="button" onClick={() => setStep(2)} className="mb-6 flex min-h-11 items-center gap-2 text-sm font-semibold underline underline-offset-4"><ArrowLeft className="size-4" /> Change date or time</button>
             <h3 className="font-serif text-4xl font-normal leading-[0.95] tracking-[-0.04em] sm:text-5xl">Your session details.</h3>
-            <div className="mt-6 border-y border-black py-4 text-sm"><p className="font-bold">{selectedDish.name}</p><p className="mt-1 text-neutral-600">{formatDate(date)} at {formatTime(time)}</p></div>
+            <div className="mt-6 border-y border-black py-4 text-sm"><p className="font-bold">{selectedDishName}</p><p className="mt-1 text-neutral-600">{formatDate(date)} at {formatTime(time)}</p></div>
             <div className="mt-7 grid gap-5 sm:grid-cols-2">
               <div className="space-y-2"><Label htmlFor="name">Your name</Label><Input id="name" name="name" required autoComplete="name" className="h-12 rounded-none border-black bg-white" /></div>
               <div className="space-y-2"><Label htmlFor="email">Email address</Label><Input id="email" name="email" type="email" required autoComplete="email" className="h-12 rounded-none border-black bg-white" /></div>
@@ -277,11 +288,11 @@ export function BookingExperience() {
           {step === 4 && date && <div className="flex min-h-[500px] flex-col items-start justify-center">
             <span className="grid size-14 place-items-center border border-black"><Check className="size-7" /></span>
             <h3 className="mt-8 max-w-xl font-serif text-5xl font-normal leading-[0.95] tracking-[-0.045em] sm:text-6xl">Session confirmed. See you in the kitchen.</h3>
-            <p className="mt-5 max-w-lg text-base leading-7 text-neutral-600">Your {selectedDish.name} session is booked for {formatDate(date)} at {formatTime(time)}.</p>
+            <p className="mt-5 max-w-lg text-base leading-7 text-neutral-600">Your {selectedDishName} session is booked for {formatDate(date)} at {formatTime(time)}.</p>
             {confirmationEmailSent ? <p className="mt-3 max-w-lg text-sm leading-6 text-neutral-600">A confirmation email with your session details has been sent.</p> : <p role="status" className="mt-3 max-w-lg border border-black p-3 text-sm leading-6">Your booking is saved, but the confirmation email could not be sent. Keep the booking reference below or call +1 (416) 826-8466.</p>}
             {meetingUrl && <a href={meetingUrl} target="_blank" rel="noreferrer" className="mt-6 inline-flex min-h-12 items-center justify-center bg-black px-5 text-sm font-semibold text-white hover:bg-neutral-800">Join the virtual session <ArrowRight className="ml-2 size-4" /></a>}
             <p className="mt-6 border-y border-black py-3 text-xs">Booking reference: {bookingId}</p>
-            <Button variant="outline" onClick={() => { setStep(1); setDate(undefined); setTime(""); setBookingId(""); setConfirmationEmailSent(false); setMeetingUrl(null); }} className="mt-8 h-12 rounded-none border-black bg-transparent">Book another session</Button>
+            <Button variant="outline" onClick={() => { setStep(1); setDishId(dishes[0].id); setCustomDishName(""); setDate(undefined); setTime(""); setBookingId(""); setConfirmationEmailSent(false); setMeetingUrl(null); }} className="mt-8 h-12 rounded-none border-black bg-transparent">Book another session</Button>
           </div>}
         </div>
       </section>
