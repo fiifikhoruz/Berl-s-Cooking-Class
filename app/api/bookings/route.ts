@@ -5,7 +5,7 @@ import { sendBookingEmails } from "@/lib/booking-emails";
 import { getAvailability } from "@/lib/schedule";
 
 const bookingSchema = z.object({
-  dishId: z.enum(["jollof", "waakye", "red-red", "groundnut-soup"]),
+  dishId: z.enum(["jollof", "waakye", "red-red", "groundnut-soup", "other"]),
   dishName: z.string().min(2).max(80),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   time: z.string().regex(/^\d{2}:\d{2}$/),
@@ -15,11 +15,19 @@ const bookingSchema = z.object({
   notes: z.string().trim().max(600).optional().default(""),
 });
 
+const listedDishNames: Record<Exclude<z.infer<typeof bookingSchema>["dishId"], "other">, string> = {
+  jollof: "Ghana Jollof",
+  waakye: "Waakye",
+  "red-red": "Red Red",
+  "groundnut-soup": "Groundnut Soup",
+};
+
 export async function POST(request: Request) {
   try {
     const parsed = bookingSchema.safeParse(await request.json());
     if (!parsed.success) return NextResponse.json({ error: "Please check your details and try again." }, { status: 400 });
     const data = parsed.data;
+    const dishName = data.dishId === "other" ? data.dishName.trim() : listedDishNames[data.dishId];
     const availability = await getAvailability();
     if (!availability[data.date]?.includes(data.time)) {
       return NextResponse.json({ error: "That time is no longer available. Please choose another." }, { status: 409 });
@@ -29,7 +37,7 @@ export async function POST(request: Request) {
     await createBooking({
       id,
       dishId: data.dishId,
-      dishName: data.dishName,
+      dishName,
       sessionDate: data.date,
       sessionTime: data.time,
       guestName: data.name,
@@ -43,7 +51,7 @@ export async function POST(request: Request) {
     const bookingId = id.split("-")[0].toUpperCase();
     const emailResult = await sendBookingEmails({
       bookingReference: bookingId,
-      dishName: data.dishName,
+      dishName,
       sessionDate: data.date,
       sessionTime: data.time,
       guestName: data.name,
