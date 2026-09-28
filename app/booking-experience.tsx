@@ -212,7 +212,7 @@ export function BookingExperience() {
         <div className="relative z-10 mx-auto flex min-h-screen max-w-[1440px] flex-col supports-[height:100svh]:min-h-[100svh]">
           <header className="flex min-h-24 items-center justify-between gap-4 border-b border-white/40 bg-white px-4 py-2 text-black sm:min-h-28 sm:px-8 lg:px-12">
             <a className="relative block h-[4.5rem] w-32 shrink-0 sm:h-20 sm:w-36" href="#top" onClick={(event) => scrollToSection(event, "top")} aria-label="You Can Cook Too home">
-              <Image src="/you-can-cook-too-logo.png" alt="You Can Cook Too, virtual cooking classes" fill priority sizes="(min-width: 640px) 144px, 128px" className="object-contain object-left" />
+              <Image src="/you-can-cook-too-logo.svg" alt="You Can Cook Too, virtual cooking classes" fill priority unoptimized sizes="(min-width: 640px) 144px, 128px" className="object-contain object-left" />
             </a>
             <a className="min-h-11 shrink-0 content-center border-b border-black text-sm font-semibold" href="#book" onClick={(event) => scrollToSection(event, "book")}>Book a session</a>
           </header>
