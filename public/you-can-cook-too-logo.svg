@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="logo-title logo-description">
+  <title id="logo-title">You Can Cook Too</title>
+  <desc id="logo-description">YCC monogram with a gold steam accent and the words Virtual Cooking Classes</desc>
+  <g fill="#111111" font-family="Arial, Helvetica, sans-serif" text-anchor="middle">
+    <text x="600" y="360" font-size="330" font-weight="900" letter-spacing="-44">YCC</text>
+    <text x="600" y="535" font-size="92" font-weight="800" letter-spacing="4">YOU CAN COOK TOO</text>
+    <text x="600" y="625" font-size="34" font-weight="500" letter-spacing="18">VIRTUAL COOKING CLASSES</text>
+  </g>
+  <path d="M606 286c65-77-38-112 27-193-25 78 63 108-27 193Z" fill="url(#steam)"/>
+  <defs>
+    <linearGradient id="steam" x1="590" y1="88" x2="656" y2="282" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8D78C"/>
+      <stop offset="1" stop-color="#B96927"/>
+    </linearGradient>
+  </defs>
+</svg>
