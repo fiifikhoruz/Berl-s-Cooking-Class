@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Berl's Cooking Class",
+  title: "You Can Cook Too | Berl's Cooking Class",
   description:
-    "Book a free one-on-one virtual cooking class and learn to make a Ghanaian dish with Berl.",
+    "Book a free one-on-one virtual cooking class with You Can Cook Too and learn to make a Ghanaian dish with Berl.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
