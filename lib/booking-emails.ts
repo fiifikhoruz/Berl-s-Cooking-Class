@@ -61,7 +61,7 @@ async function sendEmail(payload: { from: string; to: string[]; subject: string;
 
 export async function sendBookingEmails(input: BookingEmailInput): Promise<BookingEmailResult> {
   const from = process.env.BOOKING_FROM_EMAIL?.trim();
-  const meetingUrl = process.env.SESSION_MEETING_URL?.trim() || DEFAULT_SESSION_MEETING_URL;
+  const meetingUrl = DEFAULT_SESSION_MEETING_URL;
   const admins = notificationRecipients();
 
   if (!process.env.RESEND_API_KEY || !from) {
