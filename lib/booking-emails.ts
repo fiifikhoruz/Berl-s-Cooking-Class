@@ -15,6 +15,8 @@ export type BookingEmailResult = {
   meetingUrl: string | null;
 };
 
+const DEFAULT_SESSION_MEETING_URL = "https://meet.google.com/ayr-pcna-gpe";
+
 function escapeHtml(value: string) {
   return value.replace(/[&<>'"]/g, (character) => ({
     "&": "&amp;",
@@ -59,7 +61,7 @@ async function sendEmail(payload: { from: string; to: string[]; subject: string;
 
 export async function sendBookingEmails(input: BookingEmailInput): Promise<BookingEmailResult> {
   const from = process.env.BOOKING_FROM_EMAIL?.trim();
-  const meetingUrl = process.env.SESSION_MEETING_URL?.trim() || null;
+  const meetingUrl = process.env.SESSION_MEETING_URL?.trim() || DEFAULT_SESSION_MEETING_URL;
   const admins = notificationRecipients();
 
   if (!process.env.RESEND_API_KEY || !from) {
@@ -97,8 +99,8 @@ export async function sendBookingEmails(input: BookingEmailInput): Promise<Booki
         from,
         to: admins,
         subject: `New booking: ${input.dishName} on ${input.sessionDate}`,
-        html: `<div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#111"><h1 style="font-family:Georgia,serif;font-weight:400">New cooking session booking</h1><table style="border-collapse:collapse;width:100%;margin:24px 0"><tr><td style="border-top:1px solid #111;padding:10px 0"><strong>Guest</strong></td><td style="border-top:1px solid #111;padding:10px 0">${safe.name}</td></tr><tr><td style="border-top:1px solid #111;padding:10px 0"><strong>Email</strong></td><td style="border-top:1px solid #111;padding:10px 0">${safe.email}</td></tr><tr><td style="border-top:1px solid #111;padding:10px 0"><strong>Phone</strong></td><td style="border-top:1px solid #111;padding:10px 0">${safe.phone}</td></tr><tr><td style="border-top:1px solid #111;padding:10px 0"><strong>Dish</strong></td><td style="border-top:1px solid #111;padding:10px 0">${safe.dish}</td></tr><tr><td style="border-top:1px solid #111;padding:10px 0"><strong>Date and time</strong></td><td style="border-top:1px solid #111;padding:10px 0">${safe.date} at ${safe.time}</td></tr><tr><td style="border-top:1px solid #111;padding:10px 0"><strong>Notes</strong></td><td style="border-top:1px solid #111;padding:10px 0">${safe.notes}</td></tr><tr><td style="border-block:1px solid #111;padding:10px 0"><strong>Reference</strong></td><td style="border-block:1px solid #111;padding:10px 0">${safe.reference}</td></tr></table><p>Open the session manager to review upcoming bookings.</p></div>`,
-        text: `New cooking session booking\nGuest: ${input.guestName}\nEmail: ${input.guestEmail}\nPhone: ${input.guestPhone ?? "Not provided"}\nDish: ${input.dishName}\nDate and time: ${input.sessionDate} at ${input.sessionTime}\nNotes: ${input.notes ?? "None"}\nReference: ${input.bookingReference}`,
+        html: `<div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#111"><h1 style="font-family:Georgia,serif;font-weight:400">New cooking session booking</h1><table style="border-collapse:collapse;width:100%;margin:24px 0"><tr><td style="border-top:1px solid #111;padding:10px 0"><strong>Guest</strong></td><td style="border-top:1px solid #111;padding:10px 0">${safe.name}</td></tr><tr><td style="border-top:1px solid #111;padding:10px 0"><strong>Email</strong></td><td style="border-top:1px solid #111;padding:10px 0">${safe.email}</td></tr><tr><td style="border-top:1px solid #111;padding:10px 0"><strong>Phone</strong></td><td style="border-top:1px solid #111;padding:10px 0">${safe.phone}</td></tr><tr><td style="border-top:1px solid #111;padding:10px 0"><strong>Dish</strong></td><td style="border-top:1px solid #111;padding:10px 0">${safe.dish}</td></tr><tr><td style="border-top:1px solid #111;padding:10px 0"><strong>Date and time</strong></td><td style="border-top:1px solid #111;padding:10px 0">${safe.date} at ${safe.time}</td></tr><tr><td style="border-top:1px solid #111;padding:10px 0"><strong>Notes</strong></td><td style="border-top:1px solid #111;padding:10px 0">${safe.notes}</td></tr><tr><td style="border-block:1px solid #111;padding:10px 0"><strong>Reference</strong></td><td style="border-block:1px solid #111;padding:10px 0">${safe.reference}</td></tr></table>${meetingHtml}<p>Open the session manager to review upcoming bookings.</p></div>`,
+        text: `New cooking session booking\nGuest: ${input.guestName}\nEmail: ${input.guestEmail}\nPhone: ${input.guestPhone ?? "Not provided"}\nDish: ${input.dishName}\nDate and time: ${input.sessionDate} at ${input.sessionTime}\nNotes: ${input.notes ?? "None"}\nReference: ${input.bookingReference}\n${meetingText}`,
       })
     : Promise.resolve(false);
 
