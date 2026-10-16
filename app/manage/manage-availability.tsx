@@ -27,18 +27,30 @@ export function ManageAvailability({ bookings }: { bookings: Booking[] }) {
 
   async function saveOverride(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    if (!submitter) {
+      setMessage("Choose Open or Close to update availability.");
+      return;
+    }
+
     const form = new FormData(event.currentTarget);
+    const available = submitter.value === "true";
     setSaving(true);
     setMessage("");
-    const available = form.get("available") === "true";
-    const response = await fetch("/api/manage/availability", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date: form.get("date"), time: form.get("time"), available }),
-    });
-    const payload = await response.json() as { message?: string; error?: string };
-    setMessage(response.ok ? payload.message ?? "Availability updated." : payload.error ?? "The update could not be saved.");
-    setSaving(false);
+
+    try {
+      const response = await fetch("/api/manage/availability", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: form.get("date"), time: form.get("time"), available }),
+      });
+      const payload = await response.json() as { message?: string; error?: string };
+      setMessage(response.ok ? payload.message ?? "Availability updated." : payload.error ?? "The update could not be saved.");
+    } catch {
+      setMessage("The update could not be saved. Check your connection and try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -51,13 +63,13 @@ export function ManageAvailability({ bookings }: { bookings: Booking[] }) {
         </div>
 
         <section className="mt-8 grid border border-black lg:grid-cols-[0.75fr_1.25fr]">
-          <div className="bg-black p-6 text-white sm:p-8"><p className="text-xs font-semibold uppercase tracking-[0.16em]">Availability</p><h2 className="mt-12 font-serif text-3xl font-normal">Open or close a slot</h2><p className="mt-3 max-w-sm leading-7 text-neutral-300">Choose a date and time. Use “All times” to open or close the whole day.</p></div>
+          <div className="bg-black p-6 text-white sm:p-8"><p className="text-xs font-semibold uppercase tracking-[0.16em]">Availability</p><h2 className="mt-12 font-serif text-3xl font-normal">Open or close a slot</h2><p className="mt-3 max-w-sm leading-7 text-neutral-300">Monday to Wednesday are open automatically. Use this control for weekends, extra dates, or closures. Choose “All times” to update the whole day.</p></div>
           <form onSubmit={saveOverride} className="grid content-start gap-4 bg-white p-6 text-black sm:grid-cols-2 sm:p-8">
             <div className="space-y-2"><Label htmlFor="manage-date">Date</Label><Input id="manage-date" name="date" type="date" required min={new Date().toISOString().slice(0, 10)} className="h-11 rounded-none border-black" /></div>
             <div className="space-y-2"><Label htmlFor="manage-time">Time</Label><select id="manage-time" name="time" className="h-11 w-full rounded-none border border-black bg-white px-3 text-sm"><option value="*">All times</option><option value="10:00">10:00 AM</option><option value="13:00">1:00 PM</option><option value="16:00">4:00 PM</option><option value="18:00">6:00 PM</option></select></div>
-            <Button disabled={saving} type="submit" name="available" value="true" className="h-11 rounded-none bg-black text-white hover:bg-neutral-800"><Check /> Open</Button>
-            <Button disabled={saving} type="submit" name="available" value="false" variant="outline" className="h-11 rounded-none border-black bg-white text-black hover:bg-neutral-100"><X /> Close</Button>
-            {message && <p className="text-sm font-semibold text-neutral-600 sm:col-span-2">{message}</p>}
+            <Button disabled={saving} type="submit" name="available" value="true" className="h-12 rounded-none bg-black text-white hover:bg-neutral-800"><Check /> {saving ? "Saving…" : "Open"}</Button>
+            <Button disabled={saving} type="submit" name="available" value="false" variant="outline" className="h-12 rounded-none border-black bg-white text-black hover:bg-neutral-100"><X /> {saving ? "Saving…" : "Close"}</Button>
+            {message && <p aria-live="polite" className="text-sm font-semibold text-neutral-600 sm:col-span-2">{message}</p>}
           </form>
         </section>
 
